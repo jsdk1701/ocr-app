@@ -1,0 +1,14 @@
+# Runtime environment for OCR App. Everything comes from conda-forge so the
+# packed environment is relocatable on Windows, Apple Silicon and Intel Mac.
+name: ocr-app
+channels:
+  - conda-forge
+  - nodefaults
+dependencies:
+  - python=3.12
+  - ocrmypdf
+  - tesseract
+  - ghostscript
+  - tk
+  - pillow
+  - conda-pack

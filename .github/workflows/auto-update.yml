@@ -1,0 +1,65 @@
+name: Check for newer engines and models
+
+on:
+  schedule:
+    - cron: "17 6 1 * *"   # monthly, 1st at 06:17 UTC
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  actions: write
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: mamba-org/setup-micromamba@v2
+        with:
+          environment-name: probe
+          create-args: python=3.12
+      - name: Compare latest conda-forge and model versions with the last release
+        id: cmp
+        shell: bash -el {0}
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -e
+          micromamba search -c conda-forge --json ocrmypdf tesseract ghostscript > latest.json
+          python - <<'PY'
+          import json, os, re, subprocess, urllib.request
+          latest = json.load(open("latest.json"))
+          def newest(name):
+              vs = [p["version"] for p in latest["result"]["pkgs"] if p["name"] == name]
+              return max(vs, key=lambda v: [int(x) for x in re.findall(r"\d+", v)])
+          want = {k: newest(k) for k in ("ocrmypdf", "tesseract", "ghostscript")}
+          def sha(repo, name):
+              req = urllib.request.Request(f"https://api.github.com/repos/{repo}/contents/{name}.traineddata",
+                                           headers={"User-Agent": "ocr-app-ci", "Authorization": "Bearer " + os.environ["GH_TOKEN"]})
+              return json.load(urllib.request.urlopen(req))["sha"]
+          models = {n: sha("tesseract-ocr/tessdata_best", n) for n in ("guj", "hin", "eng")}
+          models["osd"] = sha("tesseract-ocr/tessdata", "osd")
+          try:
+              subprocess.run(["gh", "release", "download", "--repo", os.environ["GITHUB_REPOSITORY"],
+                              "--pattern", "versions.json", "-O", "current.json", "--clobber"], check=True)
+              cur = json.load(open("current.json"))
+          except Exception as e:
+              print("no previous release:", e); cur = {}
+          changed = [k for k, v in want.items() if cur.get(k) != v] + \
+                    [f"model {n}" for n, s in models.items() if cur.get("models", {}).get(n, {}).get("sha") != s]
+          old = cur.get("app", "0.0.0")
+          parts = [int(x) for x in re.findall(r"\d+", old)[:3]] + [0, 0, 0]
+          nxt = f"{parts[0]}.{parts[1]}.{parts[2] + 1}"
+          notes = "Automatic update: " + ", ".join(f"{k} {cur.get(k, '-')} -> {v}" for k, v in want.items() if cur.get(k) != v)
+          notes += "".join(f", model {n} refreshed" for n, s in models.items() if cur.get("models", {}).get(n, {}).get("sha") != s)
+          with open(os.environ["GITHUB_OUTPUT"], "a") as f:
+              f.write(f"changed={'yes' if changed and cur else 'no'}\nversion={nxt}\nnotes={notes}\n")
+          print("changed:", changed, "next:", nxt)
+          PY
+      - name: Trigger a release build
+        if: steps.cmp.outputs.changed == 'yes'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh workflow run release.yml --repo "${{ github.repository }}" \
+            -f version="${{ steps.cmp.outputs.version }}" -f notes="${{ steps.cmp.outputs.notes }}"

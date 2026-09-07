@@ -1,0 +1,10 @@
+.tools/
+.env/
+build/
+dist/
+samples/*.pdf
+*.zip
+__pycache__/
+*.pyc
+.DS_Store
+tessdata/

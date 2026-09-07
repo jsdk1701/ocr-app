@@ -1,0 +1,133 @@
+name: Build and release
+
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "Version to build and release, e.g. 0.1.3 (a tag vX is created)"
+        required: true
+      notes:
+        description: "Extra release notes (optional)"
+        required: false
+        default: ""
+
+permissions:
+  contents: write
+  issues: write
+
+jobs:
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: windows-latest
+            key: windows
+            root: "build/stage/OCR App"
+          - os: macos-latest
+            key: macos-arm64
+            root: "build/stage/OCR App/OCR App.app/Contents/Resources"
+          - os: macos-15-intel
+            key: macos-x86_64
+            root: "build/stage/OCR App/OCR App.app/Contents/Resources"
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Resolve version
+        id: v
+        shell: bash
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            echo "version=${{ inputs.version }}" >> "$GITHUB_OUTPUT"
+          else
+            echo "version=${GITHUB_REF_NAME#v}" >> "$GITHUB_OUTPUT"
+          fi
+      - uses: mamba-org/setup-micromamba@v2
+        with:
+          environment-file: environment.yml
+          environment-name: ocr-app
+          cache-environment: true
+      - name: Install PyInstaller (launcher only)
+        if: runner.os == 'Windows'
+        shell: bash -el {0}
+        run: python -m pip install pyinstaller
+      - name: Build bundle
+        shell: bash -el {0}
+        run: python packaging/build.py --prefix "$CONDA_PREFIX" --version "${{ steps.v.outputs.version }}" --repo "${{ github.repository }}"
+      - name: Smoke test
+        shell: bash -el {0}
+        run: python packaging/smoke_test.py "${{ matrix.root }}"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: bundle-${{ matrix.key }}
+          path: |
+            dist/*.zip
+            dist/versions.json
+          if-no-files-found: error
+
+  release:
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+      - name: Collect files and notes
+        id: notes
+        shell: bash
+        env:
+          NOTES: ${{ inputs.notes }}
+        run: |
+          set -e
+          VERSION="${{ github.event_name == 'workflow_dispatch' && inputs.version || github.ref_name }}"
+          VERSION="${VERSION#v}"
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+          mkdir -p release
+          cp artifacts/*/*.zip release/
+          cp artifacts/bundle-macos-arm64/versions.json release/versions.json
+          python3 - <<'PY' > release/NOTES.md
+          import json, glob
+          v = json.load(open("release/versions.json"))
+          print(f"## OCR App {v['app']}\n")
+          import os; notes = os.environ.get("NOTES", "").strip()
+          print(notes + "\n" if notes else "")
+          print("| Component | Version |\n|---|---|")
+          for k in ("ocrmypdf", "tesseract", "ghostscript", "python"):
+              print(f"| {k} | {v[k]} |")
+          for name, m in v["models"].items():
+              print(f"| model {name} | {m['sha'][:10]} |")
+          print("\nDownload the zip for your computer, unzip it fully, and read User-Guide.pdf inside.")
+          PY
+          cat release/NOTES.md
+      - name: Create tag (manual runs)
+        if: github.event_name == 'workflow_dispatch'
+        shell: bash
+        run: |
+          git config user.name "github-actions"
+          git config user.email "github-actions@users.noreply.github.com"
+          git tag -f "v${{ steps.notes.outputs.version }}"
+          git push -f origin "v${{ steps.notes.outputs.version }}"
+      - uses: softprops/action-gh-release@v2
+        with:
+          tag_name: v${{ steps.notes.outputs.version }}
+          name: OCR App ${{ steps.notes.outputs.version }}
+          body_path: release/NOTES.md
+          files: |
+            release/*.zip
+            release/versions.json
+
+  report-failure:
+    needs: build
+    if: failure() && github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Open an issue
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh issue create --repo "${{ github.repository }}" \
+            --title "Automatic build ${{ inputs.version }} failed" \
+            --body "The build or smoke test failed. See ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}. Nothing was released."
