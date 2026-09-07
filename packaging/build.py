@@ -237,6 +237,7 @@ def main() -> int:
 
     prefix = args.prefix.resolve()
     work = ROOT / "build"
+    work.mkdir(parents=True, exist_ok=True)
     bundle = work / "bundle"
     key = platform_key()
     log(f"platform {key}, version {args.version}, prefix {prefix}")
