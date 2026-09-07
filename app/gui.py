@@ -190,7 +190,7 @@ class App(tk.Tk):
     # ---------- running ----------
     def _collect_settings(self) -> settings.OcrSettings:
         s = self.settings
-        s.language = settings.LANGUAGE_BY_LABEL.get(self.lang_var.get(), "guj+hin+eng")
+        s.language = settings.LANGUAGE_BY_LABEL.get(self.lang_var.get(), "guj")
         s.deskew = self.deskew_var.get()
         s.rotate_pages = self.rotate_var.get()
         s.force_ocr = self.force_var.get()

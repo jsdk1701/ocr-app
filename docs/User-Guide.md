@@ -51,13 +51,12 @@ Then double-click the app normally.
 ## 3. Converting a PDF
 
 1. Click **Add PDF files…** and choose one or more scanned PDFs.
-2. Pick the **Language**:
-   - *Mixed (Gujarati + Hindi + English)* works for anything, and is the default.
-   - Choosing the exact language of a book (for example *Gujarati (+ English)*) gives slightly better results and is faster.
+2. Pick the **Language**. *Gujarati only* is the default. Choose *Gujarati (+ English)* for books with English passages, *Hindi (+ English)* for Hindi books, or *Mixed* when a document has all three. Picking the exact language gives the best results and is fastest.
 3. Leave **Straighten pages** and **Fix rotated pages** ticked. They correct crooked or sideways scans.
-4. Tick **Re-OCR pages that already have text** only if a PDF already has bad or wrong text in it and you want it redone.
-5. Press **Start OCR**. The progress bar shows the page count and time left. You can keep using your computer; leave the app open.
-6. When it says *All done*, click **Show output folder**. You will find:
+4. **Re-OCR pages that already have text** is ticked by default, so every page is read fresh even if the PDF already had some (possibly wrong) text. Untick it to leave such pages alone.
+5. Tick **Also save a .txt file** if you also want the plain text in a separate file.
+6. Press **Start OCR**. The progress bar shows the page count and time left. You can keep using your computer; leave the app open.
+7. When it says *All done*, click **Show output folder**. You will find:
    - `name-ocr.pdf` — the searchable PDF
    - `name-ocr.txt` — the plain text, if *Also save a .txt file* was ticked
 
@@ -76,7 +75,7 @@ On clean printed books the text is very accurate. Old, faded, decorative or hand
 The *Details* column and the box at the bottom of the window explain what happened. Common messages:
 
 - **This PDF is password-protected** — open the PDF, choose *Print* → *Save as PDF*, and convert that copy.
-- **This PDF already contains text** — it was skipped because it is already searchable. Tick *Re-OCR pages that already have text* to redo it.
+- **This PDF already contains text** — it was skipped because *Re-OCR pages that already have text* was unticked. Tick it to redo the file.
 - **Could not write the output file** — the folder is read-only or the disk is full. Move the PDF to *Documents* and try again.
 - **The 'env' folder is missing** (Windows) — the zip was not fully extracted. Extract the whole folder again.
 

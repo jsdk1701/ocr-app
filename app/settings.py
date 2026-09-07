@@ -8,8 +8,9 @@ from dataclasses import asdict, dataclass, field
 from .paths import user_config_file
 
 LANGUAGES: list[tuple[str, str]] = [
-    ("Mixed (Gujarati + Hindi + English)", "guj+hin+eng"),
+    ("Gujarati only", "guj"),
     ("Gujarati (+ English)", "guj+eng"),
+    ("Mixed (Gujarati + Hindi + English)", "guj+hin+eng"),
     ("Hindi (+ English)", "hin+eng"),
     ("English only", "eng"),
 ]
@@ -20,11 +21,11 @@ LABEL_BY_LANGUAGE = {code: label for label, code in LANGUAGES}
 
 @dataclass
 class OcrSettings:
-    language: str = "guj+hin+eng"
+    language: str = "guj"
     deskew: bool = True
     rotate_pages: bool = True
-    force_ocr: bool = False
-    sidecar: bool = True
+    force_ocr: bool = True
+    sidecar: bool = False
     jobs: int = 0  # 0 = all cores
     last_update_check: float = 0.0
     last_folder: str = ""
